@@ -839,3 +839,5 @@ document.getElementById("score-modal-confirm").addEventListener("click", async (
     confirmBtn.disabled = false;
   }
 });
+
+

@@ -111,6 +111,42 @@
         </table>
       </div>
     </section>
+    <!-- ---------- MAÇLAR ---------- -->
+    <section id="tab-maclar" class="tab-panel">
+      <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap;">
+        <div>
+          <h2>Maçlar</h2>
+          <p class="panel-sub">Seçili haftanın maçlarına tahmininizi girin</p>
+        </div>
+        <!-- Maçlar Hafta Seçici -->
+        <div class="week-select-container">
+          <select id="main-week-select" class="week-dropdown" style="padding: 8px 16px; font-family: 'Inter', sans-serif; font-weight: 600; border-radius: 8px; border: 1px solid var(--border-color, #ccc); background: var(--bg-card, #fff); cursor: pointer;">
+            <option value="1. Hafta">1. Hafta</option>
+            <option value="2. Hafta">2. Hafta</option>
+            <option value="3. Hafta">3. Hafta</option>
+            <option value="4. Hafta">4. Hafta</option>
+            <option value="5. Hafta">5. Hafta</option>
+            <option value="6. Hafta">6. Hafta</option>
+            <option value="7. Hafta">7. Hafta</option>
+            <option value="8. Hafta">8. Hafta</option>
+            <option value="9. Hafta">9. Hafta</option>
+            <option value="10. Hafta">10. Hafta</option>
+            <option value="11. Hafta">11. Hafta</option>
+            <option value="12. Hafta">12. Hafta</option>
+            <option value="13. Hafta">13. Hafta</option>
+            <option value="14. Hafta">14. Hafta</option>
+            <option value="15. Hafta">15. Hafta</option>
+            <option value="16. Hafta">16. Hafta</option>
+            <option value="17. Hafta">17. Hafta</option>
+          </select>
+        </div>
+      </div>
+      <div id="maclar-list" class="match-list">
+        <!-- JS ile doldurulacak -->
+      </div>
+      <p id="maclar-empty" class="empty-state hidden">Seçili haftada açık maç bulunmuyor.</p>
+    </section>
+
     <!-- ---------- SONUÇLAR ---------- -->
     <section id="tab-sonuclar" class="tab-panel">
       <div class="panel-header">
