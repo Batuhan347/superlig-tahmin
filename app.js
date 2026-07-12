@@ -632,7 +632,7 @@ function escapeHtml(text) {
 }
 
 // 2) GÜNCEL renderMaclar FONKSİYONU
-function renderMaclar() {
+function renderMatches() {
   const container = document.getElementById("maclar-list");
   const emptyEl = document.getElementById("maclar-empty");
   const currentWeekMatches = FIXED_MATCHES_BY_WEEK[state.selectedWeek] || [];
