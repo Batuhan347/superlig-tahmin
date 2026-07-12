@@ -1,5 +1,5 @@
 // =====================================================================
-// MAÇ TAHMİN LİGİ — app.js (Haftalık Sabit Fikstür & Otomatik Logo Entegreli)
+// MAÇ TAHMİN LİGİ — app.js (Haftalık Sabit Fikstür & Gelişmiş Kurallar)
 // Tüm uygulama mantığı: Auth (kullanıcı adı/şifre), Firestore realtime
 // senkronizasyon, sekme yönetimi, tahmin/puanlama algoritması.
 // =====================================================================
@@ -18,7 +18,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // ---------------------------------------------------------------------
-// SABİT HAFTALIK FİKSTÜR (Görsellerden Çıkarılan Gerçek Sezon Verisi)
+// SABİT HAFTALIK FİKSTÜR
 // ---------------------------------------------------------------------
 const FIXED_MATCHES_BY_WEEK = {
   "1. Hafta": [
@@ -102,7 +102,7 @@ const FIXED_MATCHES_BY_WEEK = {
   ],
   "15. Hafta": [
     { id: "w15_m1", homeTeam: "Gaziantep FK", awayTeam: "Beşiktaş" },
-    { id: "w15_m2", homeTeam: "Eyüpspor", awayTeam: "Galatasaray" },
+    { id: "w15_m2", location: "Eyüpspor", awayTeam: "Galatasaray" },
     { id: "w15_m3", homeTeam: "Fenerbahçe", awayTeam: "Trabzonspor" }
   ],
   "16. Hafta": [
@@ -122,20 +122,6 @@ const FIXED_MATCHES_BY_WEEK = {
 // ---------------------------------------------------------------------
 // 1) YARDIMCI FONKSİYONLAR
 // ---------------------------------------------------------------------
-
-// Takım logolarını çeken dinamik sistem
-function getTeamLogoUrl(teamName) {
-  const name = teamName.toLowerCase().trim();
-  if (name.includes("beşiktaş")) return "https://logo.clearbit.com/bjk.com.tr";
-  if (name.includes("galatasaray")) return "https://logo.clearbit.com/galatasaray.org";
-  if (name.includes("fenerbahçe")) return "https://logo.clearbit.com/fenerbahce.org";
-  if (name.includes("trabzonspor")) return "https://logo.clearbit.com/trabzonspor.org.tr";
-  
-  // Diğer rakipler için harflerden temizlenmiş yedek logo üretici
-  const safeName = name.replace(/[^a-z0-9]/g, "");
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(teamName)}&background=random&color=fff&size=128&bold=true`;
-}
-
 function usernameToFakeEmail(username) {
   const clean = username.trim().toLowerCase().replace(/\s+/g, "");
   return `${clean}@mactahminligi.local`;
@@ -171,9 +157,9 @@ function calculatePoints(predHome, predAway, realHome, realAway) {
 const state = {
   currentUser: null,
   users: [],
-  matches: [],       // Firestore'dan gelen canlı maç kilit/skor durumları
-  predictions: [],   // Tüm kullanıcı tahminleri
-  selectedWeek: "1. Hafta", // Varsayılan seçili hafta
+  matches: [],       
+  predictions: [],   
+  selectedWeek: "1. Hafta", 
   adminFilter: "active",
   scoreModalMatchId: null
 };
@@ -309,36 +295,33 @@ onAuthStateChanged(auth, async (firebaseUser) => {
   document.getElementById("current-username").textContent = state.currentUser.username;
   document.getElementById("admin-nav-btn").classList.toggle("hidden", state.currentUser.role !== "admin");
 
-  // Hafta seçici dropdown event listener bağlama
   setupWeekSelectListeners();
-
   startRealtimeListeners();
 });
 
-// ---------------------------------------------------------------------
-// HAFTA SEÇİCİ EVENT LISTENERS
-// ---------------------------------------------------------------------
 function setupWeekSelectListeners() {
   const mainWeekSelect = document.getElementById("main-week-select");
   const adminWeekSelect = document.getElementById("admin-week-select");
 
   if (mainWeekSelect) {
     mainWeekSelect.value = state.selectedWeek;
-    mainWeekSelect.addEventListener("change", (e) => {
-      state.selectedWeek = e.target.value;
-      if (adminWeekSelect) adminWeekSelect.value = state.selectedWeek;
-      renderAll();
-    });
+    mainWeekSelect.removeEventListener("change", handleWeekChange);
+    mainWeekSelect.addEventListener("change", handleWeekChange);
   }
-
   if (adminWeekSelect) {
     adminWeekSelect.value = state.selectedWeek;
-    adminWeekSelect.addEventListener("change", (e) => {
-      state.selectedWeek = e.target.value;
-      if (mainWeekSelect) mainWeekSelect.value = state.selectedWeek;
-      renderAll();
-    });
+    adminWeekSelect.removeEventListener("change", handleWeekChange);
+    adminWeekSelect.addEventListener("change", handleWeekChange);
   }
+}
+
+function handleWeekChange(e) {
+  state.selectedWeek = e.target.value;
+  const mainWeekSelect = document.getElementById("main-week-select");
+  const adminWeekSelect = document.getElementById("admin-week-select");
+  if (mainWeekSelect) mainWeekSelect.value = state.selectedWeek;
+  if (adminWeekSelect) adminWeekSelect.value = state.selectedWeek;
+  renderAll();
 }
 
 function renderAll() {
@@ -355,9 +338,9 @@ function startRealtimeListeners() {
   const usersUnsub = onSnapshot(collection(db, "users"), (snap) => {
     state.users = snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
     renderSiralama();
+    renderAdmin(); 
   });
 
-  // Maçların kilit ve bitiş skor durumlarını takip eden Firestore koleksiyonu
   const matchesUnsub = onSnapshot(collection(db, "matches"), (snap) => {
     state.matches = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderAll();
@@ -385,16 +368,14 @@ document.querySelectorAll(".nav-btn").forEach((btn) => {
 });
 
 // ---------------------------------------------------------------------
-// 9) "MAÇLAR" SEKMESİ — Seçili haftanın henüz bitmemiş maçları + tahmin girişi
+// 9) "MAÇLAR" SEKMESİ — Tahmin Girişi, Kendi Tahminini Görme ve Silme
 // ---------------------------------------------------------------------
 function renderMaclar() {
   const container = document.getElementById("maclar-list");
   const emptyEl = document.getElementById("maclar-empty");
   
-  // Sabit fikstürden seçili haftanın maçlarını alıyoruz
   const currentWeekMatches = FIXED_MATCHES_BY_WEEK[state.selectedWeek] || [];
 
-  // Firestore'daki kilit/bitiş durumlarını sabit maç verileriyle harmanla
   const activeMatches = currentWeekMatches.map(fixedMatch => {
     const liveState = state.matches.find(m => m.id === fixedMatch.id) || { isLocked: false, isFinished: false };
     return { ...fixedMatch, ...liveState };
@@ -408,6 +389,8 @@ function renderMaclar() {
     const card = document.createElement("div");
     card.className = "match-card";
 
+    const isAdmin = state.currentUser.role === "admin";
+
     let bodyHtml = `
       <div class="match-card-top">
         <span class="match-datetime">${state.selectedWeek}</span>
@@ -415,32 +398,35 @@ function renderMaclar() {
           ${match.isLocked ? "Kilitli" : "Tahmine Açık"}
         </span>
       </div>
-      <div class="match-teams-row" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-        <div class="team-side home" style="display:flex; align-items:center; gap:8px; flex:1; justify-content:flex-end;">
-          <span class="team-name">${escapeHtml(match.homeTeam)}</span>
-          <img src="${getTeamLogoUrl(match.homeTeam)}" style="width:32px; height:32px; object-fit:contain;" alt="logo">
-        </div>
+      <div class="match-teams-row">
+        <span class="team-name home">${escapeHtml(match.homeTeam)}</span>
         <div class="score-box-group">
-          <input type="number" min="0" max="99" class="score-box pred-home" ${match.isLocked ? "disabled" : ""}
+          <input type="number" min="0" max="99" class="score-box pred-home" ${match.isLocked || isAdmin ? "disabled" : ""}
                  value="${myPred ? myPred.predHome : ""}" placeholder="-">
           <span class="score-sep">-</span>
-          <input type="number" min="0" max="99" class="score-box pred-away" ${match.isLocked ? "disabled" : ""}
+          <input type="number" min="0" max="99" class="score-box pred-away" ${match.isLocked || isAdmin ? "disabled" : ""}
                  value="${myPred ? myPred.predAway : ""}" placeholder="-">
         </div>
-        <div class="team-side away" style="display:flex; align-items:center; gap:8px; flex:1; justify-content:flex-start;">
-          <img src="${getTeamLogoUrl(match.awayTeam)}" style="width:32px; height:32px; object-fit:contain;" alt="logo">
-          <span class="team-name">${escapeHtml(match.awayTeam)}</span>
-        </div>
+        <span class="team-name away">${escapeHtml(match.awayTeam)}</span>
       </div>
     `;
 
-    if (!match.isLocked) {
+    if (isAdmin) {
+      bodyHtml += `<div class="field-hint" style="text-align:center; margin-top:10px; color:var(--text-muted);">Admin hesapları tahmin yapamaz.</div>`;
+    } else if (!match.isLocked) {
       bodyHtml += `
-        <div class="match-card-footer">
+        <div class="match-card-footer" style="display:flex; gap:10px; justify-content:center; margin-top:12px;">
           <button class="btn-save-pred" data-matchid="${match.id}">Tahmini Kaydet</button>
+          ${myPred ? `<button class="btn-delete-pred" data-matchid="${match.id}" style="background:#ef4444; color:#fff; border:none; padding:6px 12px; border-radius:6px; cursor:pointer;">Tahmini Sil</button>` : ""}
         </div>
+        ${myPred ? `
+          <div style="text-align:center; margin-top:10px; font-size:0.9rem; color:#10b981;">
+            Mevcut Tahmininiz: <b>${myPred.predHome} - ${myPred.predAway}</b>
+          </div>
+        ` : ""}
       `;
     } else {
+      // Maç kilitliyse sadece DİĞER kullanıcıların tahminlerini göster
       const preds = state.predictions.filter((p) => p.matchId === match.id);
       bodyHtml += `<div class="pred-reveal-list">${
         preds.length
@@ -456,8 +442,12 @@ function renderMaclar() {
     card.innerHTML = bodyHtml;
     container.appendChild(card);
 
-    if (!match.isLocked) {
+    if (!match.isLocked && !isAdmin) {
       card.querySelector(".btn-save-pred").addEventListener("click", () => saveMyPrediction(match));
+      const delBtn = card.querySelector(".btn-delete-pred");
+      if (delBtn) {
+        delBtn.addEventListener("click", () => deleteMyPrediction(match.id));
+      }
     }
   });
 }
@@ -494,8 +484,19 @@ async function saveMyPrediction(match) {
   }
 }
 
+async function deleteMyPrediction(matchId) {
+  if (!confirm("Tahmininizi silmek istediğinize emin misiniz?")) return;
+  const predId = `${matchId}_${state.currentUser.uid}`;
+  try {
+    await deleteDoc(doc(db, "predictions", predId));
+    showToast("Tahmininiz silindi");
+  } catch (err) {
+    showToast("Tahmin silinemedi");
+  }
+}
+
 // ---------------------------------------------------------------------
-// 10) "SONUÇLAR" SEKMESİ — Seçili haftanın tamamlanmış maçları
+// 10) "SONUÇLAR" SEKMESİ
 // ---------------------------------------------------------------------
 function renderSonuclar() {
   const container = document.getElementById("sonuclar-list");
@@ -520,16 +521,10 @@ function renderSonuclar() {
         <span class="match-datetime">${state.selectedWeek}</span>
         <span class="match-status-badge badge-finished">Tamamlandı</span>
       </div>
-      <div class="match-teams-row" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-        <div class="team-side home" style="display:flex; align-items:center; gap:8px; flex:1; justify-content:flex-end;">
-          <span class="team-name">${escapeHtml(match.homeTeam)}</span>
-          <img src="${getTeamLogoUrl(match.homeTeam)}" style="width:32px; height:32px; object-fit:contain;" alt="logo">
-        </div>
+      <div class="match-teams-row">
+        <span class="team-name home">${escapeHtml(match.homeTeam)}</span>
         <span class="match-final-score" style="font-weight:bold; font-size:1.2rem;">${match.homeScore} - ${match.awayScore}</span>
-        <div class="team-side away" style="display:flex; align-items:center; gap:8px; flex:1; justify-content:flex-start;">
-          <img src="${getTeamLogoUrl(match.awayTeam)}" style="width:32px; height:32px; object-fit:contain;" alt="logo">
-          <span class="team-name">${escapeHtml(match.awayTeam)}</span>
-        </div>
+        <span class="team-name away">${escapeHtml(match.awayTeam)}</span>
       </div>
       <div class="pred-reveal-list">
         ${
@@ -555,21 +550,23 @@ function renderSonuclar() {
 }
 
 // ---------------------------------------------------------------------
-// 11) "SIRALAMA" SEKMESİ — Genel Liderlik tablosu (Tüm tamamlanan maçlar üzerinden)
+// 11) "SIRALAMA" SEKMESİ — Adminler Kesinlikle Eklenmez
 // ---------------------------------------------------------------------
 function renderSiralama() {
   const tbody = document.getElementById("leaderboard-body");
   const emptyEl = document.getElementById("leaderboard-empty");
   if (!state.currentUser) return;
 
-  // Tüm sabit fikstür listesi üzerinden Firestore'da isFinished olanları buluyoruz
   const allFixedMatches = Object.values(FIXED_MATCHES_BY_WEEK).flat();
   const finishedMatches = allFixedMatches.map(fixedMatch => {
     const liveState = state.matches.find(m => m.id === fixedMatch.id) || { isFinished: false };
     return { ...fixedMatch, ...liveState };
   }).filter((m) => m.isFinished);
 
-  const rows = state.users.map((user) => {
+  // Filtreleme: rolü admin olan kullanıcıları puan durumundan çıkarıyoruz
+  const playersOnly = state.users.filter(u => u.role !== "admin");
+
+  const rows = playersOnly.map((user) => {
     let P = 0, TS = 0, KB = 0, Y = 0;
     const O = finishedMatches.length;
 
@@ -610,7 +607,7 @@ function renderSiralama() {
 }
 
 // ---------------------------------------------------------------------
-// 12) "ADMIN" SEKMESİ — Seçili haftanın maçlarını kilitleme, skor girme
+// 12) "ADMIN" SEKMESİ — Maç Yönetimi ve Kullanıcı Silme
 // ---------------------------------------------------------------------
 document.querySelectorAll(".admin-filter-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -626,8 +623,8 @@ function renderAdmin() {
   const emptyEl = document.getElementById("admin-empty");
   if (!state.currentUser || state.currentUser.role !== "admin") return;
 
+  // --- 1. Maç Yönetim Paneli ---
   const currentWeekMatches = FIXED_MATCHES_BY_WEEK[state.selectedWeek] || [];
-
   const combinedMatches = currentWeekMatches.map(fixedMatch => {
     const liveState = state.matches.find(m => m.id === fixedMatch.id) || { isLocked: false, isFinished: false, homeScore: null, awayScore: null };
     return { ...fixedMatch, ...liveState };
@@ -651,19 +648,13 @@ function renderAdmin() {
           ${match.isFinished ? "Tamamlandı" : match.isLocked ? "Kilitli" : "Açık"}
         </span>
       </div>
-      <div class="match-teams-row" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-        <div class="team-side home" style="display:flex; align-items:center; gap:8px; flex:1; justify-content:flex-end;">
-          <span class="team-name">${escapeHtml(match.homeTeam)}</span>
-          <img src="${getTeamLogoUrl(match.homeTeam)}" style="width:28px; height:28px; object-fit:contain;" alt="logo">
-        </div>
+      <div class="match-teams-row">
+        <span class="team-name home">${escapeHtml(match.homeTeam)}</span>
         ${match.isFinished
           ? `<span class="match-final-score" style="font-weight:bold;">${match.homeScore} - ${match.awayScore}</span>`
           : `<span class="score-sep">vs</span>`
         }
-        <div class="team-side away" style="display:flex; align-items:center; gap:8px; flex:1; justify-content:flex-start;">
-          <img src="${getTeamLogoUrl(match.awayTeam)}" style="width:28px; height:28px; object-fit:contain;" alt="logo">
-          <span class="team-name">${escapeHtml(match.awayTeam)}</span>
-        </div>
+        <span class="team-name away">${escapeHtml(match.awayTeam)}</span>
       </div>
       <p class="field-hint" style="text-align:center;margin-top:8px;">${predCount} tahmin girildi</p>
       <div class="admin-card-actions">
@@ -691,6 +682,61 @@ function renderAdmin() {
   container.querySelectorAll("[data-action='reset-match']").forEach((btn) => {
     btn.addEventListener("click", () => resetMatchScore(btn.dataset.matchid));
   });
+
+  // --- 2. Dinamik Kullanıcı Listesi ve Silme Butonları (Arayüz Entegresi) ---
+  renderUserManagementSection();
+}
+
+function renderUserManagementSection() {
+  let userSection = document.getElementById("admin-user-management");
+  if (!userSection) {
+    userSection = document.createElement("div");
+    userSection.id = "admin-user-management";
+    userSection.style.marginTop = "30px";
+    userSection.style.paddingTop = "20px";
+    userSection.style.borderTop = "2px dashed #4f5464";
+    document.getElementById("tab-admin").appendChild(userSection);
+  }
+
+  userSection.innerHTML = `
+    <h3 style="margin-bottom: 12px; font-family:'Rajdhani'; font-size:1.4rem;">👤 Kullanıcı Yönetimi</h3>
+    <div class="user-list-container" style="display:flex; flex-direction:column; gap:8px;">
+      ${state.users.map(u => {
+        const isMe = u.uid === state.currentUser.uid;
+        return `
+          <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-card, #2a2d34); padding:10px 16px; border-radius:8px;">
+            <span>${escapeHtml(u.username)} <small style="color:gray;">(${u.role})</small></span>
+            ${!isMe ? `<button class="btn-delete-user" data-uid="${u.uid}" style="background:#ef4444; color:#fff; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:600;">Kullanıcıyı Sil</button>` : `<span style="color:gray; font-size:0.9rem;">Siz</span>`}
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+
+  userSection.querySelectorAll(".btn-delete-user").forEach(btn => {
+    btn.addEventListener("click", () => deleteUserFromSystem(btn.dataset.uid));
+  });
+}
+
+async function deleteUserFromSystem(uid) {
+  if (!confirm("Bu kullanıcıyı sistemden tamamen silmek istediğinize emin misiniz? Tüm verileri kaybolacaktır.")) return;
+  try {
+    // Kullanıcıyı Firestore'dan sil
+    await deleteDoc(doc(db, "users", uid));
+
+    // Kullanıcının yaptığı tüm tahminleri topluca temizle (Batch write)
+    const userPreds = state.predictions.filter(p => p.uid === uid);
+    if (userPreds.length > 0) {
+      const batch = writeBatch(db);
+      userPreds.forEach(p => {
+        batch.delete(doc(db, "predictions", p.id));
+      });
+      await batch.commit();
+    }
+    showToast("Kullanıcı başarıyla silindi");
+  } catch (err) {
+    showToast("Kullanıcı silinirken bir hata oluştu");
+  }
 }
 
 async function toggleLock(matchId, currentlyLocked) {
@@ -722,7 +768,6 @@ async function resetMatchScore(matchId) {
   }
 }
 
-// --- Skor girme modalı ---
 function openScoreModal(matchId, home, away) {
   state.scoreModalMatchId = matchId;
   document.getElementById("score-modal-teams").textContent = `${home} vs ${away}`;
@@ -786,5 +831,5 @@ function escapeHtml(str) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot.");
 }
