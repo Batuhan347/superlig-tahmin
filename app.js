@@ -549,9 +549,9 @@ function renderSonuclar() {
   });
 }
 
-// ---------------------------------------------------------------------
-// 11) "SIRALAMA" SEKMESİ — Adminler Kesinlikle Eklenmez
-// ---------------------------------------------------------------------
+// ... (İlk kısımlar, Firebase imports ve FIXED_MATCHES_BY_WEEK aynı kalmalı) ...
+
+// 1) DÜZELTİLMİŞ RENDER SIRALAMA (Takım kısaltması yerine isim üzerinden eşleme)
 function renderSiralama() {
   const tbody = document.getElementById("leaderboard-body");
   const teamStatsBody = document.getElementById("team-stats-body");
@@ -568,23 +568,18 @@ function renderSiralama() {
 
   const rows = playersOnly.map((user) => {
     let P = 0, TS = 0, KB = 0, Y = 0;
-    // Takım kısaltmalarına göre TS sayaçları
-    const teamTS = { BJK: 0, GS: 0, FB: 0, TS: 0 };
+    const teamTS = { "Beşiktaş": 0, "Galatasaray": 0, "Fenerbahçe": 0, "Trabzonspor": 0 };
 
     finishedMatches.forEach((match) => {
       const pred = state.predictions.find((p) => p.matchId === match.id && p.uid === user.uid);
-      if (!pred) {
-        Y += 1;
-        return;
-      }
+      if (!pred) { Y += 1; return; }
       const { points, type } = calculatePoints(pred.predHome, pred.predAway, match.homeScore, match.awayScore);
       P += points;
       
       if (type === "TS") {
         TS += 1;
-        // Tahmin edilen takımın kısaltmasını buluyoruz (HomeTeam kısaltması varsayıldı)
-        if (teamTS.hasOwnProperty(match.homeTeamShort)) {
-          teamTS[match.homeTeamShort] += 1;
+        if (teamTS.hasOwnProperty(match.homeTeam)) {
+          teamTS[match.homeTeam] += 1;
         }
       } else if (type === "KB") {
         KB += 1;
@@ -596,12 +591,8 @@ function renderSiralama() {
     return { uid: user.uid, username: user.username, P, TS, KB, Y, teamTS };
   });
 
-  // SIRALAMA: Puan (P) büyükten küçüğe, eşitse Yanlış (Y) küçükten büyüğe
   rows.sort((a, b) => b.P - a.P || a.Y - b.Y);
 
-  if (emptyEl) emptyEl.classList.toggle("hidden", finishedMatches.length > 0);
-  
-  // Ana Puan Tablosu (Averaj sütunu kaldırıldı)
   if (tbody) {
     tbody.innerHTML = rows.map((r, i) => `
       <tr class="${i === 0 ? "rank-1" : ""} ${r.uid === state.currentUser.uid ? "is-me" : ""}">
@@ -615,18 +606,81 @@ function renderSiralama() {
     `).join("");
   }
 
-  // Yeni Takım Bazlı TS Tablosu
   if (teamStatsBody) {
     teamStatsBody.innerHTML = rows.map(r => `
       <tr>
         <td>${escapeHtml(r.username)}</td>
-        <td>${r.teamTS.BJK}</td>
-        <td>${r.teamTS.GS}</td>
-        <td>${r.teamTS.FB}</td>
-        <td>${r.teamTS.TS}</td>
+        <td>${r.teamTS["Beşiktaş"]}</td>
+        <td>${r.teamTS["Galatasaray"]}</td>
+        <td>${r.teamTS["Fenerbahçe"]}</td>
+        <td>${r.teamTS["Trabzonspor"]}</td>
       </tr>
     `).join("");
   }
+}
+
+// 2) MAÇLARIN GÖRÜNMESİNİ SAĞLAYAN GÜNCEL renderMaclar
+function renderMaclar() {
+  const container = document.getElementById("maclar-list");
+  const emptyEl = document.getElementById("maclar-empty");
+  const currentWeekMatches = FIXED_MATCHES_BY_WEEK[state.selectedWeek] || [];
+
+  container.innerHTML = "";
+  
+  currentWeekMatches.forEach(fixedMatch => {
+    const liveState = state.matches.find(m => m.id === fixedMatch.id) || { isLocked: false, isFinished: false };
+    const match = { ...fixedMatch, ...liveState };
+    if (match.isFinished) return; // Bitenleri gösterme
+
+    const myPred = state.predictions.find((p) => p.matchId === match.id && p.uid === state.currentUser.uid);
+    const card = document.createElement("div");
+    card.className = "match-card";
+    
+    card.innerHTML = `
+      <div class="match-card-top">
+        <span>${state.selectedWeek}</span>
+        <span class="${match.isLocked ? "badge-locked" : "badge-open"}">${match.isLocked ? "Kilitli" : "Açık"}</span>
+      </div>
+      <div class="match-teams-row">
+        <span>${match.homeTeam}</span>
+        <input type="number" class="pred-home" value="${myPred?.predHome || ""}" ${match.isLocked ? "disabled" : ""}>
+        <span>-</span>
+        <input type="number" class="pred-away" value="${myPred?.predAway || ""}" ${match.isLocked ? "disabled" : ""}>
+        <span>${match.awayTeam}</span>
+      </div>
+      ${!match.isLocked ? `<button class="btn-save-pred" data-matchid="${match.id}">Kaydet</button>` : ""}
+    `;
+    container.appendChild(card);
+  });
+  
+  container.querySelectorAll(".btn-save-pred").forEach(btn => 
+    btn.addEventListener("click", () => saveMyPrediction({ id: btn.dataset.matchid }))
+  );
+}
+
+// 3) MODAL VE DİĞER YARDIMCILAR (Eksik kalan kısımlar)
+function openScoreModal(matchId, home, away) {
+  state.scoreModalMatchId = matchId;
+  document.getElementById("score-modal-teams").textContent = `${home} vs ${away}`;
+  document.getElementById("score-modal").classList.remove("hidden");
+}
+
+document.getElementById("score-modal-confirm").addEventListener("click", async () => {
+  const homeScore = parseInt(document.getElementById("score-modal-home").value);
+  const awayScore = parseInt(document.getElementById("score-modal-away").value);
+  
+  await setDoc(doc(db, "matches", state.scoreModalMatchId), {
+    isFinished: true, isLocked: true, homeScore, awayScore
+  }, { merge: true });
+  
+  document.getElementById("score-modal").classList.add("hidden");
+  showToast("Skor girildi ve maç kapandı");
+});
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
 }
 // ---------------------------------------------------------------------
 // 12) "ADMIN" SEKMESİ — Maç Yönetimi ve Kullanıcı Silme
