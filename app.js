@@ -1,5 +1,5 @@
 // =====================================================================
-// MAÇ TAHMİN LİGİ — app.js
+// MAÇ TAHMİN LİGİ — app.js (Haftalık Sabit Fikstür & Otomatik Logo Entegreli)
 // Tüm uygulama mantığı: Auth (kullanıcı adı/şifre), Firestore realtime
 // senkronizasyon, sekme yönetimi, tahmin/puanlama algoritması.
 // =====================================================================
@@ -18,12 +18,124 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // ---------------------------------------------------------------------
+// SABİT HAFTALIK FİKSTÜR (Görsellerden Çıkarılan Gerçek Sezon Verisi)
+// ---------------------------------------------------------------------
+const FIXED_MATCHES_BY_WEEK = {
+  "1. Hafta": [
+    { id: "w1_m1", homeTeam: "Beşiktaş", awayTeam: "Eyüpspor" },
+    { id: "w1_m2", homeTeam: "Galatasaray", awayTeam: "Çorum FK" },
+    { id: "w1_m3", homeTeam: "Gençlerbirliği", awayTeam: "Fenerbahçe" },
+    { id: "w1_m4", homeTeam: "Kasımpaşa", awayTeam: "Trabzonspor" }
+  ],
+  "2. Hafta": [
+    { id: "w2_m1", homeTeam: "Alanyaspor", awayTeam: "Beşiktaş" },
+    { id: "w2_m2", homeTeam: "Erzurumspor FK", awayTeam: "Galatasaray" },
+    { id: "w2_m3", homeTeam: "Fenerbahçe", awayTeam: "Konyaspor" },
+    { id: "w2_m4", homeTeam: "Trabzonspor", awayTeam: "Başakşehir" }
+  ],
+  "3. Hafta": [
+    { id: "w3_m1", homeTeam: "Beşiktaş", awayTeam: "Çorum FK" },
+    { id: "w3_m2", homeTeam: "Galatasaray", awayTeam: "Göztepe" },
+    { id: "w3_m3", homeTeam: "Samsunspor", awayTeam: "Fenerbahçe" },
+    { id: "w3_m4", homeTeam: "Amed SF", awayTeam: "Trabzonspor" }
+  ],
+  "4. Hafta": [
+    { id: "w4_m1", homeTeam: "Fenerbahçe", awayTeam: "Beşiktaş" },
+    { id: "w4_m2", homeTeam: "Başakşehir", awayTeam: "Galatasaray" },
+    { id: "w4_m3", homeTeam: "Trabzonspor", awayTeam: "Gençlerbirliği" }
+  ],
+  "5. Hafta": [
+    { id: "w5_m1", homeTeam: "Beşiktaş", awayTeam: "Erzurumspor FK" },
+    { id: "w5_m2", homeTeam: "Galatasaray", awayTeam: "Kocaelispor" },
+    { id: "w5_m3", homeTeam: "Gaziantep FK", awayTeam: "Fenerbahçe" },
+    { id: "w5_m4", homeTeam: "Konyaspor", awayTeam: "Trabzonspor" }
+  ],
+  "6. Hafta": [
+    { id: "w6_m1", homeTeam: "Amed SF", awayTeam: "Beşiktaş" },
+    { id: "w6_m2", homeTeam: "Trabzonspor", awayTeam: "Galatasaray" },
+    { id: "w6_m3", homeTeam: "Fenerbahçe", awayTeam: "Eyüpspor" }
+  ],
+  "7. Hafta": [
+    { id: "w7_m1", homeTeam: "Beşiktaş", awayTeam: "Kocaelispor" },
+    { id: "w7_m2", homeTeam: "Galatasaray", awayTeam: "Kasımpaşa" },
+    { id: "w7_m3", homeTeam: "Rizespor", awayTeam: "Fenerbahçe" },
+    { id: "w7_m4", homeTeam: "Samsunspor", awayTeam: "Trabzonspor" }
+  ],
+  "8. Hafta": [
+    { id: "w8_m1", homeTeam: "Trabzonspor", awayTeam: "Beşiktaş" },
+    { id: "w8_m2", homeTeam: "Gençlerbirliği", awayTeam: "Galatasaray" },
+    { id: "w8_m3", homeTeam: "Fenerbahçe", awayTeam: "Alanyaspor" }
+  ],
+  "9. Hafta": [
+    { id: "w9_m1", homeTeam: "Beşiktaş", awayTeam: "Başakşehir" },
+    { id: "w9_m2", homeTeam: "Galatasaray", awayTeam: "Fenerbahçe" },
+    { id: "w9_m3", homeTeam: "Çaykur Rizespor", awayTeam: "Trabzonspor" }
+  ],
+  "10. Hafta": [
+    { id: "w10_m1", homeTeam: "Kasımpaşa", awayTeam: "Beşiktaş" },
+    { id: "w10_m2", homeTeam: "Konyaspor", awayTeam: "Galatasaray" },
+    { id: "w10_m3", homeTeam: "Fenerbahçe", awayTeam: "Göztepe" },
+    { id: "w10_m4", homeTeam: "Trabzonspor", awayTeam: "Gaziantep FK" }
+  ],
+  "11. Hafta": [
+    { id: "w11_m1", homeTeam: "Beşiktaş", awayTeam: "Gençlerbirliği" },
+    { id: "w11_m2", homeTeam: "Galatasaray", awayTeam: "Amed SF" },
+    { id: "w11_m3", homeTeam: "Çorum FK", awayTeam: "Fenerbahçe" },
+    { id: "w11_m4", homeTeam: "Alanyaspor", awayTeam: "Trabzonspor" }
+  ],
+  "12. Hafta": [
+    { id: "w12_m1", homeTeam: "Konyaspor", awayTeam: "Beşiktaş" },
+    { id: "w12_m2", homeTeam: "Galatasaray", awayTeam: "Samsunspor" },
+    { id: "w12_m3", homeTeam: "Kocaelispor", awayTeam: "Fenerbahçe" },
+    { id: "w12_m4", homeTeam: "Trabzonspor", awayTeam: "Eyüpspor" }
+  ],
+  "13. Hafta": [
+    { id: "w13_m1", homeTeam: "Beşiktaş", awayTeam: "Galatasaray" },
+    { id: "w13_m2", homeTeam: "Fenerbahçe", awayTeam: "Erzurumspor FK" },
+    { id: "w13_m3", homeTeam: "Göztepe", awayTeam: "Trabzonspor" }
+  ],
+  "14. Hafta": [
+    { id: "w14_m1", homeTeam: "Beşiktaş", awayTeam: "Samsunspor" },
+    { id: "w14_m2", homeTeam: "Galatasaray", awayTeam: "Rizespor" },
+    { id: "w14_m3", homeTeam: "Başakşehir", awayTeam: "Fenerbahçe" },
+    { id: "w14_m4", homeTeam: "Trabzonspor", awayTeam: "Çorum FK" }
+  ],
+  "15. Hafta": [
+    { id: "w15_m1", homeTeam: "Gaziantep FK", awayTeam: "Beşiktaş" },
+    { id: "w15_m2", homeTeam: "Eyüpspor", awayTeam: "Galatasaray" },
+    { id: "w15_m3", homeTeam: "Fenerbahçe", awayTeam: "Trabzonspor" }
+  ],
+  "16. Hafta": [
+    { id: "w16_m1", homeTeam: "Beşiktaş", awayTeam: "Rizespor" },
+    { id: "w16_m2", homeTeam: "Galatasaray", awayTeam: "Alanyaspor" },
+    { id: "w16_m3", homeTeam: "Kasımpaşa", awayTeam: "Fenerbahçe" },
+    { id: "w16_m4", homeTeam: "Trabzonspor", awayTeam: "Kocaelispor" }
+  ],
+  "17. Hafta": [
+    { id: "w17_m1", homeTeam: "Göztepe", awayTeam: "Beşiktaş" },
+    { id: "w17_m2", homeTeam: "Gaziantep FK", awayTeam: "Galatasaray" },
+    { id: "w17_m3", homeTeam: "Fenerbahçe", awayTeam: "Amed SF" },
+    { id: "w17_m4", homeTeam: "Erzurum FK", awayTeam: "Trabzonspor" }
+  ]
+};
+
+// ---------------------------------------------------------------------
 // 1) YARDIMCI FONKSİYONLAR
 // ---------------------------------------------------------------------
 
-// Firebase Auth e-posta ister; kullanıcı adını sahte/deterministik bir
-// e-postaya çeviriyoruz. Böylece kullanıcı için "kullanıcı adı + şifre"
-// deneyimi korunmuş oluyor.
+// Takım logolarını çeken dinamik sistem
+function getTeamLogoUrl(teamName) {
+  const name = teamName.toLowerCase().trim();
+  if (name.includes("beşiktaş")) return "https://logo.clearbit.com/bjk.com.tr";
+  if (name.includes("galatasaray")) return "https://logo.clearbit.com/galatasaray.org";
+  if (name.includes("fenerbahçe")) return "https://logo.clearbit.com/fenerbahce.org";
+  if (name.includes("trabzonspor")) return "https://logo.clearbit.com/trabzonspor.org.tr";
+  
+  // Diğer rakipler için harflerden temizlenmiş yedek logo üretici
+  const safeName = name.replace(/[^a-z0-9]/g, "");
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(teamName)}&background=random&color=fff&size=128&bold=true`;
+}
+
 function usernameToFakeEmail(username) {
   const clean = username.trim().toLowerCase().replace(/\s+/g, "");
   return `${clean}@mactahminligi.local`;
@@ -31,16 +143,6 @@ function usernameToFakeEmail(username) {
 
 function normalizeUsername(username) {
   return username.trim();
-}
-
-function formatMatchDate(timestamp) {
-  if (!timestamp) return "--";
-  const d = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  const gun = String(d.getDate()).padStart(2, "0");
-  const ay = String(d.getMonth() + 1).padStart(2, "0");
-  const saat = String(d.getHours()).padStart(2, "0");
-  const dk = String(d.getMinutes()).padStart(2, "0");
-  return `${gun}.${ay}.${d.getFullYear()} ${saat}:${dk}`;
 }
 
 function showToast(text) {
@@ -51,10 +153,6 @@ function showToast(text) {
   showToast._t = setTimeout(() => toast.classList.remove("show"), 2200);
 }
 
-// Tahmin puanlama algoritması (proje şartnamesindeki kurallara göre):
-//   Tam Skor doğru  -> +2  (TS)
-//   Sadece kazanan/beraberlik doğru -> +1 (K/B)
-//   İkisi de yanlış  -> 0  (Y)
 function calculatePoints(predHome, predAway, realHome, realAway) {
   if (predHome === realHome && predAway === realAway) {
     return { points: 2, type: "TS" };
@@ -71,15 +169,16 @@ function calculatePoints(predHome, predAway, realHome, realAway) {
 // 2) UYGULAMA DURUMU (STATE)
 // ---------------------------------------------------------------------
 const state = {
-  currentUser: null,   // { uid, username, role }
-  users: [],           // tüm kayıtlı kullanıcılar [{uid, username, role}]
-  matches: [],          // tüm maçlar
-  predictions: [],      // tüm tahminler
-  adminFilter: "active", // admin sekmesi filtre durumu: 'active' | 'past'
+  currentUser: null,
+  users: [],
+  matches: [],       // Firestore'dan gelen canlı maç kilit/skor durumları
+  predictions: [],   // Tüm kullanıcı tahminleri
+  selectedWeek: "1. Hafta", // Varsayılan seçili hafta
+  adminFilter: "active",
   scoreModalMatchId: null
 };
 
-let unsubscribers = []; // logout'ta listener'ları kapatmak için
+let unsubscribers = [];
 
 // ---------------------------------------------------------------------
 // 3) AUTH — KAYIT OL
@@ -103,12 +202,6 @@ document.getElementById("signup-form").addEventListener("submit", async (e) => {
     const cred = await createUserWithEmailAndPassword(auth, fakeEmail, password);
     const uid = cred.user.uid;
 
-    // Özel Admin Mekanizması:
-    // "config/admin" tekil dokümanını transaction içinde okuyup, kullanıcı
-    // adı tam olarak "admin" ise VE bu hak daha önce kimseye verilmemişse
-    // (claimed=false) bu kullanıcıyı kalıcı admin yapıyoruz. Transaction
-    // kullanmamızın sebebi eşzamanlı iki "Admin" kaydında yarış durumunu
-    // (race condition) önlemek.
     const isAdminUsername = usernameRaw.toLowerCase() === "admin";
     const adminConfigRef = doc(db, "config", "admin");
 
@@ -133,7 +226,6 @@ document.getElementById("signup-form").addEventListener("submit", async (e) => {
     });
 
     showToast(finalRole === "admin" ? "Yönetici hesabı oluşturuldu!" : "Hesabın oluşturuldu!");
-    // onAuthStateChanged geri kalanı halledecek (uygulamayı açacak)
   } catch (err) {
     errorEl.textContent = firebaseErrorToTurkish(err);
   } finally {
@@ -175,7 +267,6 @@ function firebaseErrorToTurkish(err) {
   return "Bir hata oluştu, lütfen tekrar dene.";
 }
 
-// Auth sekmeleri arası geçiş (Giriş Yap / Kayıt Ol)
 document.querySelectorAll(".auth-tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".auth-tab-btn").forEach((b) => b.classList.remove("active"));
@@ -192,10 +283,9 @@ document.querySelectorAll(".auth-tab-btn").forEach((btn) => {
 document.getElementById("logout-btn").addEventListener("click", () => signOut(auth));
 
 // ---------------------------------------------------------------------
-// 6) AUTH DURUM DİNLEYİCİSİ — giriş/çıkışta ekranları yönetir
+// 6) AUTH DURUM DİNLEYİCİSİ
 // ---------------------------------------------------------------------
 onAuthStateChanged(auth, async (firebaseUser) => {
-  // Önce eski dinleyicileri temizle
   unsubscribers.forEach((unsub) => unsub());
   unsubscribers = [];
 
@@ -208,7 +298,6 @@ onAuthStateChanged(auth, async (firebaseUser) => {
 
   const userSnap = await getDoc(doc(db, "users", firebaseUser.uid));
   if (!userSnap.exists()) {
-    // Beklenmedik durum: auth var ama kullanıcı dokümanı yok
     await signOut(auth);
     return;
   }
@@ -220,44 +309,70 @@ onAuthStateChanged(auth, async (firebaseUser) => {
   document.getElementById("current-username").textContent = state.currentUser.username;
   document.getElementById("admin-nav-btn").classList.toggle("hidden", state.currentUser.role !== "admin");
 
+  // Hafta seçici dropdown event listener bağlama
+  setupWeekSelectListeners();
+
   startRealtimeListeners();
 });
+
+// ---------------------------------------------------------------------
+// HAFTA SEÇİCİ EVENT LISTENERS
+// ---------------------------------------------------------------------
+function setupWeekSelectListeners() {
+  const mainWeekSelect = document.getElementById("main-week-select");
+  const adminWeekSelect = document.getElementById("admin-week-select");
+
+  if (mainWeekSelect) {
+    mainWeekSelect.value = state.selectedWeek;
+    mainWeekSelect.addEventListener("change", (e) => {
+      state.selectedWeek = e.target.value;
+      if (adminWeekSelect) adminWeekSelect.value = state.selectedWeek;
+      renderAll();
+    });
+  }
+
+  if (adminWeekSelect) {
+    adminWeekSelect.value = state.selectedWeek;
+    adminWeekSelect.addEventListener("change", (e) => {
+      state.selectedWeek = e.target.value;
+      if (mainWeekSelect) mainWeekSelect.value = state.selectedWeek;
+      renderAll();
+    });
+  }
+}
+
+function renderAll() {
+  renderMaclar();
+  renderSonuclar();
+  renderAdmin();
+  renderSiralama();
+}
 
 // ---------------------------------------------------------------------
 // 7) FIRESTORE REALTIME DİNLEYİCİLERİ
 // ---------------------------------------------------------------------
 function startRealtimeListeners() {
-  // Kullanıcılar (leaderboard için gerekli)
   const usersUnsub = onSnapshot(collection(db, "users"), (snap) => {
     state.users = snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
     renderSiralama();
   });
 
-  // Maçlar — tarihe göre artan (kronolojik) sırada
-  const matchesUnsub = onSnapshot(
-    query(collection(db, "matches"), orderBy("matchDate", "asc")),
-    (snap) => {
-      state.matches = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      renderMaclar();
-      renderSonuclar();
-      renderAdmin();
-      renderSiralama();
-    }
-  );
+  // Maçların kilit ve bitiş skor durumlarını takip eden Firestore koleksiyonu
+  const matchesUnsub = onSnapshot(collection(db, "matches"), (snap) => {
+    state.matches = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderAll();
+  });
 
-  // Tahminler — tüm tahminleri tek koleksiyondan dinliyoruz
   const predsUnsub = onSnapshot(collection(db, "predictions"), (snap) => {
     state.predictions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    renderMaclar();
-    renderSonuclar();
-    renderSiralama();
+    renderAll();
   });
 
   unsubscribers.push(usersUnsub, matchesUnsub, predsUnsub);
 }
 
 // ---------------------------------------------------------------------
-// 8) ALT NAVİGASYON — sekme geçişi (sayfa yenilenmeden)
+// 8) ALT NAVİGASYON
 // ---------------------------------------------------------------------
 document.querySelectorAll(".nav-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -270,12 +385,20 @@ document.querySelectorAll(".nav-btn").forEach((btn) => {
 });
 
 // ---------------------------------------------------------------------
-// 9) "MAÇLAR" SEKMESİ — henüz bitmemiş maçlar + tahmin girişi
+// 9) "MAÇLAR" SEKMESİ — Seçili haftanın henüz bitmemiş maçları + tahmin girişi
 // ---------------------------------------------------------------------
 function renderMaclar() {
   const container = document.getElementById("maclar-list");
   const emptyEl = document.getElementById("maclar-empty");
-  const activeMatches = state.matches.filter((m) => !m.isFinished);
+  
+  // Sabit fikstürden seçili haftanın maçlarını alıyoruz
+  const currentWeekMatches = FIXED_MATCHES_BY_WEEK[state.selectedWeek] || [];
+
+  // Firestore'daki kilit/bitiş durumlarını sabit maç verileriyle harmanla
+  const activeMatches = currentWeekMatches.map(fixedMatch => {
+    const liveState = state.matches.find(m => m.id === fixedMatch.id) || { isLocked: false, isFinished: false };
+    return { ...fixedMatch, ...liveState };
+  }).filter(m => !m.isFinished);
 
   container.innerHTML = "";
   emptyEl.classList.toggle("hidden", activeMatches.length > 0);
@@ -287,13 +410,16 @@ function renderMaclar() {
 
     let bodyHtml = `
       <div class="match-card-top">
-        <span class="match-datetime">${formatMatchDate(match.matchDate)}</span>
+        <span class="match-datetime">${state.selectedWeek}</span>
         <span class="match-status-badge ${match.isLocked ? "badge-locked" : "badge-open"}">
           ${match.isLocked ? "Kilitli" : "Tahmine Açık"}
         </span>
       </div>
-      <div class="match-teams-row">
-        <span class="team-name home">${escapeHtml(match.homeTeam)}</span>
+      <div class="match-teams-row" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div class="team-side home" style="display:flex; align-items:center; gap:8px; flex:1; justify-content:flex-end;">
+          <span class="team-name">${escapeHtml(match.homeTeam)}</span>
+          <img src="${getTeamLogoUrl(match.homeTeam)}" style="width:32px; height:32px; object-fit:contain;" alt="logo">
+        </div>
         <div class="score-box-group">
           <input type="number" min="0" max="99" class="score-box pred-home" ${match.isLocked ? "disabled" : ""}
                  value="${myPred ? myPred.predHome : ""}" placeholder="-">
@@ -301,7 +427,10 @@ function renderMaclar() {
           <input type="number" min="0" max="99" class="score-box pred-away" ${match.isLocked ? "disabled" : ""}
                  value="${myPred ? myPred.predAway : ""}" placeholder="-">
         </div>
-        <span class="team-name away">${escapeHtml(match.awayTeam)}</span>
+        <div class="team-side away" style="display:flex; align-items:center; gap:8px; flex:1; justify-content:flex-start;">
+          <img src="${getTeamLogoUrl(match.awayTeam)}" style="width:32px; height:32px; object-fit:contain;" alt="logo">
+          <span class="team-name">${escapeHtml(match.awayTeam)}</span>
+        </div>
       </div>
     `;
 
@@ -312,7 +441,6 @@ function renderMaclar() {
         </div>
       `;
     } else {
-      // Maç kilitliyse herkesin tahminini göster
       const preds = state.predictions.filter((p) => p.matchId === match.id);
       bodyHtml += `<div class="pred-reveal-list">${
         preds.length
@@ -351,11 +479,12 @@ async function saveMyPrediction(match) {
   try {
     await setDoc(doc(db, "predictions", predId), {
       matchId: match.id,
+      week: state.selectedWeek,
       uid: state.currentUser.uid,
       username: state.currentUser.username,
       predHome,
       predAway,
-      points: null,       // maç bitene kadar null; admin skoru girince hesaplanır
+      points: null,
       updatedAt: serverTimestamp()
     }, { merge: true });
 
@@ -366,12 +495,18 @@ async function saveMyPrediction(match) {
 }
 
 // ---------------------------------------------------------------------
-// 10) "SONUÇLAR" SEKMESİ — tamamlanmış maçlar + herkesin tahmini/puanı
+// 10) "SONUÇLAR" SEKMESİ — Seçili haftanın tamamlanmış maçları
 // ---------------------------------------------------------------------
 function renderSonuclar() {
   const container = document.getElementById("sonuclar-list");
   const emptyEl = document.getElementById("sonuclar-empty");
-  const finished = state.matches.filter((m) => m.isFinished);
+  
+  const currentWeekMatches = FIXED_MATCHES_BY_WEEK[state.selectedWeek] || [];
+
+  const finished = currentWeekMatches.map(fixedMatch => {
+    const liveState = state.matches.find(m => m.id === fixedMatch.id) || { isFinished: false };
+    return { ...fixedMatch, ...liveState };
+  }).filter((m) => m.isFinished);
 
   container.innerHTML = "";
   emptyEl.classList.toggle("hidden", finished.length > 0);
@@ -382,13 +517,19 @@ function renderSonuclar() {
     card.className = "match-card";
     card.innerHTML = `
       <div class="match-card-top">
-        <span class="match-datetime">${formatMatchDate(match.matchDate)}</span>
+        <span class="match-datetime">${state.selectedWeek}</span>
         <span class="match-status-badge badge-finished">Tamamlandı</span>
       </div>
-      <div class="match-teams-row">
-        <span class="team-name home">${escapeHtml(match.homeTeam)}</span>
-        <span class="match-final-score">${match.homeScore} - ${match.awayScore}</span>
-        <span class="team-name away">${escapeHtml(match.awayTeam)}</span>
+      <div class="match-teams-row" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div class="team-side home" style="display:flex; align-items:center; gap:8px; flex:1; justify-content:flex-end;">
+          <span class="team-name">${escapeHtml(match.homeTeam)}</span>
+          <img src="${getTeamLogoUrl(match.homeTeam)}" style="width:32px; height:32px; object-fit:contain;" alt="logo">
+        </div>
+        <span class="match-final-score" style="font-weight:bold; font-size:1.2rem;">${match.homeScore} - ${match.awayScore}</span>
+        <div class="team-side away" style="display:flex; align-items:center; gap:8px; flex:1; justify-content:flex-start;">
+          <img src="${getTeamLogoUrl(match.awayTeam)}" style="width:32px; height:32px; object-fit:contain;" alt="logo">
+          <span class="team-name">${escapeHtml(match.awayTeam)}</span>
+        </div>
       </div>
       <div class="pred-reveal-list">
         ${
@@ -414,23 +555,28 @@ function renderSonuclar() {
 }
 
 // ---------------------------------------------------------------------
-// 11) "SIRALAMA" SEKMESİ — Liderlik tablosu (P, O, TS, K/B, Y, AV)
+// 11) "SIRALAMA" SEKMESİ — Genel Liderlik tablosu (Tüm tamamlanan maçlar üzerinden)
 // ---------------------------------------------------------------------
 function renderSiralama() {
   const tbody = document.getElementById("leaderboard-body");
   const emptyEl = document.getElementById("leaderboard-empty");
   if (!state.currentUser) return;
 
-  const finishedMatches = state.matches.filter((m) => m.isFinished);
+  // Tüm sabit fikstür listesi üzerinden Firestore'da isFinished olanları buluyoruz
+  const allFixedMatches = Object.values(FIXED_MATCHES_BY_WEEK).flat();
+  const finishedMatches = allFixedMatches.map(fixedMatch => {
+    const liveState = state.matches.find(m => m.id === fixedMatch.id) || { isFinished: false };
+    return { ...fixedMatch, ...liveState };
+  }).filter((m) => m.isFinished);
 
   const rows = state.users.map((user) => {
     let P = 0, TS = 0, KB = 0, Y = 0;
-    const O = finishedMatches.length; // Oynanan maç sayısı = sonuçlanan TÜM maçlar (tahmin yapılmasa bile)
+    const O = finishedMatches.length;
 
     finishedMatches.forEach((match) => {
       const pred = state.predictions.find((p) => p.matchId === match.id && p.uid === user.uid);
       if (!pred) {
-        Y += 1; // tahmin yapılmadıysa otomatik yanlış/boş
+        Y += 1;
         return;
       }
       const { points, type } = calculatePoints(pred.predHome, pred.predAway, match.homeScore, match.awayScore);
@@ -444,53 +590,28 @@ function renderSiralama() {
     return { uid: user.uid, username: user.username, P, O, TS, KB, Y, AV };
   });
 
-  // Puanı en yüksek olan en üstte
   rows.sort((a, b) => b.P - a.P || parseFloat(b.AV) - parseFloat(a.AV));
 
-  emptyEl.classList.toggle("hidden", finishedMatches.length > 0);
-  tbody.innerHTML = rows.map((r, i) => `
-    <tr class="${i === 0 ? "rank-1" : ""} ${r.uid === state.currentUser.uid ? "is-me" : ""}">
-      <td class="col-rank">${i + 1}</td>
-      <td class="col-name">${escapeHtml(r.username)}</td>
-      <td class="col-points">${r.P}</td>
-      <td>${r.O}</td>
-      <td>${r.TS}</td>
-      <td>${r.KB}</td>
-      <td>${r.Y}</td>
-      <td>${r.AV}</td>
-    </tr>
-  `).join("");
+  if (emptyEl) emptyEl.classList.toggle("hidden", finishedMatches.length > 0);
+  if (tbody) {
+    tbody.innerHTML = rows.map((r, i) => `
+      <tr class="${i === 0 ? "rank-1" : ""} ${r.uid === state.currentUser.uid ? "is-me" : ""}">
+        <td class="col-rank">${i + 1}</td>
+        <td class="col-name">${escapeHtml(r.username)}</td>
+        <td class="col-points">${r.P}</td>
+        <td>${r.O}</td>
+        <td>${r.TS}</td>
+        <td>${r.KB}</td>
+        <td>${r.Y}</td>
+        <td>${r.AV}</td>
+      </tr>
+    `).join("");
+  }
 }
 
 // ---------------------------------------------------------------------
-// 12) "ADMIN" SEKMESİ — maç ekleme, filtre, kilitleme, skor girme
+// 12) "ADMIN" SEKMESİ — Seçili haftanın maçlarını kilitleme, skor girme
 // ---------------------------------------------------------------------
-document.getElementById("add-match-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const homeTeam = document.getElementById("new-home-team").value.trim();
-  const awayTeam = document.getElementById("new-away-team").value.trim();
-  const datetimeVal = document.getElementById("new-match-datetime").value;
-  if (!homeTeam || !awayTeam || !datetimeVal) return;
-
-  try {
-    await addDoc(collection(db, "matches"), {
-      homeTeam,
-      awayTeam,
-      matchDate: Timestamp.fromDate(new Date(datetimeVal)),
-      isLocked: false,
-      isFinished: false,
-      homeScore: null,
-      awayScore: null,
-      createdAt: serverTimestamp()
-    });
-    e.target.reset();
-    showToast("Maç eklendi");
-  } catch (err) {
-    showToast("Maç eklenemedi");
-  }
-});
-
-// Aktif / Geçmiş filtre sekmeleri
 document.querySelectorAll(".admin-filter-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".admin-filter-btn").forEach((b) => b.classList.remove("active"));
@@ -505,9 +626,16 @@ function renderAdmin() {
   const emptyEl = document.getElementById("admin-empty");
   if (!state.currentUser || state.currentUser.role !== "admin") return;
 
+  const currentWeekMatches = FIXED_MATCHES_BY_WEEK[state.selectedWeek] || [];
+
+  const combinedMatches = currentWeekMatches.map(fixedMatch => {
+    const liveState = state.matches.find(m => m.id === fixedMatch.id) || { isLocked: false, isFinished: false, homeScore: null, awayScore: null };
+    return { ...fixedMatch, ...liveState };
+  });
+
   const filtered = state.adminFilter === "active"
-    ? state.matches.filter((m) => !m.isFinished)
-    : state.matches.filter((m) => m.isFinished);
+    ? combinedMatches.filter((m) => !m.isFinished)
+    : combinedMatches.filter((m) => m.isFinished);
 
   container.innerHTML = "";
   emptyEl.classList.toggle("hidden", filtered.length > 0);
@@ -518,18 +646,24 @@ function renderAdmin() {
     card.className = "match-card";
     card.innerHTML = `
       <div class="match-card-top">
-        <span class="match-datetime">${formatMatchDate(match.matchDate)}</span>
+        <span class="match-datetime">${state.selectedWeek}</span>
         <span class="match-status-badge ${match.isFinished ? "badge-finished" : match.isLocked ? "badge-locked" : "badge-open"}">
           ${match.isFinished ? "Tamamlandı" : match.isLocked ? "Kilitli" : "Açık"}
         </span>
       </div>
-      <div class="match-teams-row">
-        <span class="team-name home">${escapeHtml(match.homeTeam)}</span>
+      <div class="match-teams-row" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div class="team-side home" style="display:flex; align-items:center; gap:8px; flex:1; justify-content:flex-end;">
+          <span class="team-name">${escapeHtml(match.homeTeam)}</span>
+          <img src="${getTeamLogoUrl(match.homeTeam)}" style="width:28px; height:28px; object-fit:contain;" alt="logo">
+        </div>
         ${match.isFinished
-          ? `<span class="match-final-score">${match.homeScore} - ${match.awayScore}</span>`
+          ? `<span class="match-final-score" style="font-weight:bold;">${match.homeScore} - ${match.awayScore}</span>`
           : `<span class="score-sep">vs</span>`
         }
-        <span class="team-name away">${escapeHtml(match.awayTeam)}</span>
+        <div class="team-side away" style="display:flex; align-items:center; gap:8px; flex:1; justify-content:flex-start;">
+          <img src="${getTeamLogoUrl(match.awayTeam)}" style="width:28px; height:28px; object-fit:contain;" alt="logo">
+          <span class="team-name">${escapeHtml(match.awayTeam)}</span>
+        </div>
       </div>
       <p class="field-hint" style="text-align:center;margin-top:8px;">${predCount} tahmin girildi</p>
       <div class="admin-card-actions">
@@ -540,8 +674,9 @@ function renderAdmin() {
           <button class="btn-admin-action btn-score" data-action="enter-score" data-matchid="${match.id}" data-home="${escapeHtml(match.homeTeam)}" data-away="${escapeHtml(match.awayTeam)}">
             Skor Gir
           </button>
-        ` : ``}
-        <button class="btn-admin-action btn-delete" data-action="delete-match" data-matchid="${match.id}">Sil</button>
+        ` : `
+          <button class="btn-admin-action btn-unlock" data-action="reset-match" data-matchid="${match.id}">Skoru Sıfırla (Geri Al)</button>
+        `}
       </div>
     `;
     container.appendChild(card);
@@ -553,20 +688,38 @@ function renderAdmin() {
   container.querySelectorAll("[data-action='enter-score']").forEach((btn) => {
     btn.addEventListener("click", () => openScoreModal(btn.dataset.matchid, btn.dataset.home, btn.dataset.away));
   });
-  container.querySelectorAll("[data-action='delete-match']").forEach((btn) => {
-    btn.addEventListener("click", () => deleteMatch(btn.dataset.matchid));
+  container.querySelectorAll("[data-action='reset-match']").forEach((btn) => {
+    btn.addEventListener("click", () => resetMatchScore(btn.dataset.matchid));
   });
 }
 
 async function toggleLock(matchId, currentlyLocked) {
-  await updateDoc(doc(db, "matches", matchId), { isLocked: !currentlyLocked });
+  await setDoc(doc(db, "matches", matchId), { isLocked: !currentlyLocked }, { merge: true });
   showToast(!currentlyLocked ? "Maç kilitlendi" : "Kilit açıldı");
 }
 
-async function deleteMatch(matchId) {
-  if (!confirm("Bu maçı silmek istediğine emin misin? Bu işlem geri alınamaz.")) return;
-  await deleteDoc(doc(db, "matches", matchId));
-  showToast("Maç silindi");
+async function resetMatchScore(matchId) {
+  if (!confirm("Bu maçın skorunu sıfırlamak ve tahmine geri açmak istediğinize emin misiniz?")) return;
+  try {
+    await setDoc(doc(db, "matches", matchId), {
+      isFinished: false,
+      isLocked: false,
+      homeScore: null,
+      awayScore: null
+    }, { merge: true });
+
+    const relatedPreds = state.predictions.filter((p) => p.matchId === matchId);
+    if (relatedPreds.length > 0) {
+      const batch = writeBatch(db);
+      relatedPreds.forEach((p) => {
+        batch.update(doc(db, "predictions", p.id), { points: null });
+      });
+      await batch.commit();
+    }
+    showToast("Maç skoru sıfırlandı.");
+  } catch (err) {
+    showToast("İşlem başarısız oldu.");
+  }
 }
 
 // --- Skor girme modalı ---
@@ -596,16 +749,14 @@ document.getElementById("score-modal-confirm").addEventListener("click", async (
   confirmBtn.disabled = true;
 
   try {
-    // 1) Maçı tamamlandı olarak işaretle + gerçek skoru kaydet
-    await updateDoc(doc(db, "matches", matchId), {
+    await setDoc(doc(db, "matches", matchId), {
       isFinished: true,
       isLocked: true,
       homeScore,
       awayScore,
       finishedAt: serverTimestamp()
-    });
+    }, { merge: true });
 
-    // 2) Bu maça yapılmış tüm tahminlerin puanlarını topluca güncelle (batch write)
     const relatedPreds = state.predictions.filter((p) => p.matchId === matchId);
     if (relatedPreds.length > 0) {
       const batch = writeBatch(db);
@@ -618,7 +769,7 @@ document.getElementById("score-modal-confirm").addEventListener("click", async (
 
     document.getElementById("score-modal").classList.add("hidden");
     state.scoreModalMatchId = null;
-    showToast("Hafta kapatıldı, puanlar güncellendi");
+    showToast("Skor girildi, puanlar hesaplandı!");
   } catch (err) {
     showToast("Bir hata oluştu, tekrar dene");
   } finally {
@@ -627,8 +778,7 @@ document.getElementById("score-modal-confirm").addEventListener("click", async (
 });
 
 // ---------------------------------------------------------------------
-// 13) GÜVENLİK — basit HTML escape (kullanıcı girdilerini kart içine
-//     yazarken XSS'i önlemek için)
+// 13) GÜVENLİK — basit HTML escape
 // ---------------------------------------------------------------------
 function escapeHtml(str) {
   if (str == null) return "";
