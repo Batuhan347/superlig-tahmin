@@ -619,7 +619,19 @@ function renderSiralama() {
   }
 }
 
-// 1) GÜNCEL renderMaclar FONKSİYONU
+// =====================================================================
+// GÜNCEL VE TEMİZLENMİŞ KOD YAPISI
+// =====================================================================
+
+// 1) TEK BİR ESCAPEHTML FONKSİYONU (DOM tabanlı ve güvenli)
+function escapeHtml(text) {
+  if (text == null) return "";
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// 2) GÜNCEL renderMaclar FONKSİYONU
 function renderMaclar() {
   const container = document.getElementById("maclar-list");
   const emptyEl = document.getElementById("maclar-empty");
@@ -627,9 +639,7 @@ function renderMaclar() {
 
   container.innerHTML = "";
   
-  // Maçları döngüye al
   currentWeekMatches.forEach(fixedMatch => {
-    // Veritabanından gelen eşleşen maç durumunu bul
     const liveState = state.matches.find(m => m.id === fixedMatch.id) || { 
         isLocked: false, 
         isFinished: false 
@@ -637,7 +647,6 @@ function renderMaclar() {
     
     const match = { ...fixedMatch, ...liveState };
 
-    // Eğer maç bitmişse (isFinished: true), Maçlar sekmesinde gösterme
     if (match.isFinished) return;
 
     const myPred = state.predictions.find((p) => p.matchId === match.id && p.uid === state.currentUser?.uid);
@@ -665,7 +674,6 @@ function renderMaclar() {
     container.appendChild(card);
   });
 
-  // Aktif maç kalmadıysa boş mesajını göster
   const activeCount = currentWeekMatches.filter(fm => {
       const m = state.matches.find(ma => ma.id === fm.id);
       return !m || !m.isFinished;
@@ -673,48 +681,19 @@ function renderMaclar() {
   
   emptyEl.classList.toggle("hidden", activeCount > 0);
 
-  // Buton dinleyicilerini tekrar bağla
   container.querySelectorAll(".btn-save-pred").forEach(btn => 
     btn.addEventListener("click", () => saveMyPrediction({ id: btn.dataset.matchid }))
   );
 }
 
-// 2) DİĞER GÜNCELLEME: Tüm render fonksiyonlarını tetikleyen merkez
-// 693-699 arası kodun şu şekilde olmalı:
-function escapeHtml(str) {
-  if (str == null) return "";
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot.");
-} // <--- Bu süslü parantezi mutlaka ekle (fonksiyonu kapatmak için)
-
-// 700. satırdan itibaren diğer yardımcı fonksiyonların:
-// 3) MODAL VE DİĞER YARDIMCILAR (Eksik kalan kısımlar)
+// 3) MODAL YARDIMCI FONKSİYONU
 function openScoreModal(matchId, home, away) {
   state.scoreModalMatchId = matchId;
   document.getElementById("score-modal-teams").textContent = `${home} vs ${away}`;
   document.getElementById("score-modal").classList.remove("hidden");
 }
 
-// ... [Dosyanın geri kalan tüm fonksiyonlarını (saveMyPrediction, renderAdmin, renderSonuclar, renderSiralama vb.) buraya ekle] ...
-
-// 3) GÜVENLİK
-function escapeHtml(str) {
-  if (str == null) return "";
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot.");
-// 3) MODAL VE DİĞER YARDIMCILAR (Eksik kalan kısımlar)
-function openScoreModal(matchId, home, away) {
-  state.scoreModalMatchId = matchId;
-  document.getElementById("score-modal-teams").textContent = `${home} vs ${away}`;
-  document.getElementById("score-modal").classList.remove("hidden");
-}
-
+// 4) MODAL ONAY İŞLEMİ
 document.getElementById("score-modal-confirm").addEventListener("click", async () => {
   const homeScore = parseInt(document.getElementById("score-modal-home").value);
   const awayScore = parseInt(document.getElementById("score-modal-away").value);
@@ -726,12 +705,6 @@ document.getElementById("score-modal-confirm").addEventListener("click", async (
   document.getElementById("score-modal").classList.add("hidden");
   showToast("Skor girildi ve maç kapandı");
 });
-
-function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.textContent = text;
-  return div.innerHTML;
-}
 // ---------------------------------------------------------------------
 // 12) "ADMIN" SEKMESİ — Maç Yönetimi ve Kullanıcı Silme
 // ---------------------------------------------------------------------
