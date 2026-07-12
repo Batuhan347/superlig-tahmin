@@ -1,22 +1,25 @@
-// =====================================================================
-// FIREBASE YAPILANDIRMASI
-// =====================================================================
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Kullanıcılar kendi profillerini oluşturabilir ve okuyabilir
+    match /users/{uid} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == uid;
+      allow update: if request.auth != null && request.auth.uid == uid;
+    }
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    // Config ve Maçlar herkes tarafından okunabilir
+    match /config/admin {
+      allow read: if true;
+    }
+    match /matches/{matchId} {
+      allow read: if request.auth != null;
+    }
 
-// Projenize özel Firebase bağlantı bilgileri
-const firebaseConfig = {
-  apiKey: "AIzaSyDfRP7uRWDidJ_I0smhkHcXbQr34L_7lv4",
-  authDomain: "superlig-tahmin.firebaseapp.com",
-  projectId: "superlig-tahmin",
-  storageBucket: "superlig-tahmin.firebasestorage.app",
-  messagingSenderId: "69259937286",
-  appId: "1:69259937286:web:489b323ab6666e4b238d67"
-};
-
-// Firebase servislerini başlat ve diğer dosyalarda kullanılmak üzere dışa aktar
-export const firebaseApp = initializeApp(firebaseConfig);
-export const auth = getAuth(firebaseApp);
-export const db = getFirestore(firebaseApp);
+    // Tahminler: Sadece giriş yapan ve kendi verisi olan
+    match /predictions/{predId} {
+      allow read, create, update: if request.auth != null && request.resource.data.uid == request.auth.uid;
+    }
+  }
+}
