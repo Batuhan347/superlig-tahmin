@@ -619,7 +619,7 @@ function renderSiralama() {
   }
 }
 
-// 2) MAÇLARIN GÖRÜNMESİNİ SAĞLAYAN GÜNCEL renderMaclar
+// 1) GÜNCEL renderMaclar FONKSİYONU
 function renderMaclar() {
   const container = document.getElementById("maclar-list");
   const emptyEl = document.getElementById("maclar-empty");
@@ -627,37 +627,87 @@ function renderMaclar() {
 
   container.innerHTML = "";
   
+  // Maçları döngüye al
   currentWeekMatches.forEach(fixedMatch => {
-    const liveState = state.matches.find(m => m.id === fixedMatch.id) || { isLocked: false, isFinished: false };
+    // Veritabanından gelen eşleşen maç durumunu bul
+    const liveState = state.matches.find(m => m.id === fixedMatch.id) || { 
+        isLocked: false, 
+        isFinished: false 
+    };
+    
     const match = { ...fixedMatch, ...liveState };
-    if (match.isFinished) return; // Bitenleri gösterme
 
-    const myPred = state.predictions.find((p) => p.matchId === match.id && p.uid === state.currentUser.uid);
+    // Eğer maç bitmişse (isFinished: true), Maçlar sekmesinde gösterme
+    if (match.isFinished) return;
+
+    const myPred = state.predictions.find((p) => p.matchId === match.id && p.uid === state.currentUser?.uid);
+    const isAdmin = state.currentUser?.role === "admin";
+    
     const card = document.createElement("div");
     card.className = "match-card";
     
     card.innerHTML = `
       <div class="match-card-top">
         <span>${state.selectedWeek}</span>
-        <span class="${match.isLocked ? "badge-locked" : "badge-open"}">${match.isLocked ? "Kilitli" : "Açık"}</span>
+        <span class="${match.isLocked ? "badge-locked" : "badge-open"}">
+           ${match.isLocked ? "Kilitli" : "Tahmine Açık"}
+        </span>
       </div>
       <div class="match-teams-row">
-        <span>${match.homeTeam}</span>
-        <input type="number" class="pred-home" value="${myPred?.predHome || ""}" ${match.isLocked ? "disabled" : ""}>
+        <span>${escapeHtml(match.homeTeam)}</span>
+        <input type="number" class="pred-home" value="${myPred?.predHome ?? ""}" ${match.isLocked || isAdmin ? "disabled" : ""}>
         <span>-</span>
-        <input type="number" class="pred-away" value="${myPred?.predAway || ""}" ${match.isLocked ? "disabled" : ""}>
-        <span>${match.awayTeam}</span>
+        <input type="number" class="pred-away" value="${myPred?.predAway ?? ""}" ${match.isLocked || isAdmin ? "disabled" : ""}>
+        <span>${escapeHtml(match.awayTeam)}</span>
       </div>
-      ${!match.isLocked ? `<button class="btn-save-pred" data-matchid="${match.id}">Kaydet</button>` : ""}
+      ${!match.isLocked && !isAdmin ? `<button class="btn-save-pred" data-matchid="${match.id}">Tahmini Kaydet</button>` : ""}
     `;
     container.appendChild(card);
   });
+
+  // Aktif maç kalmadıysa boş mesajını göster
+  const activeCount = currentWeekMatches.filter(fm => {
+      const m = state.matches.find(ma => ma.id === fm.id);
+      return !m || !m.isFinished;
+  }).length;
   
+  emptyEl.classList.toggle("hidden", activeCount > 0);
+
+  // Buton dinleyicilerini tekrar bağla
   container.querySelectorAll(".btn-save-pred").forEach(btn => 
     btn.addEventListener("click", () => saveMyPrediction({ id: btn.dataset.matchid }))
   );
 }
 
+// 2) DİĞER GÜNCELLEME: Tüm render fonksiyonlarını tetikleyen merkez
+// 693-699 arası kodun şu şekilde olmalı:
+function escapeHtml(str) {
+  if (str == null) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot.");
+} // <--- Bu süslü parantezi mutlaka ekle (fonksiyonu kapatmak için)
+
+// 700. satırdan itibaren diğer yardımcı fonksiyonların:
+// 3) MODAL VE DİĞER YARDIMCILAR (Eksik kalan kısımlar)
+function openScoreModal(matchId, home, away) {
+  state.scoreModalMatchId = matchId;
+  document.getElementById("score-modal-teams").textContent = `${home} vs ${away}`;
+  document.getElementById("score-modal").classList.remove("hidden");
+}
+
+// ... [Dosyanın geri kalan tüm fonksiyonlarını (saveMyPrediction, renderAdmin, renderSonuclar, renderSiralama vb.) buraya ekle] ...
+
+// 3) GÜVENLİK
+function escapeHtml(str) {
+  if (str == null) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot.");
 // 3) MODAL VE DİĞER YARDIMCILAR (Eksik kalan kısımlar)
 function openScoreModal(matchId, home, away) {
   state.scoreModalMatchId = matchId;
