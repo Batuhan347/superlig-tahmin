@@ -102,7 +102,7 @@ const FIXED_MATCHES_BY_WEEK = {
   ],
   "15. Hafta": [
     { id: "w15_m1", homeTeam: "Gaziantep FK", awayTeam: "Beşiktaş" },
-    { id: "w15_m2", location: "Eyüpspor", awayTeam: "Galatasaray" },
+    { id: "w15_m2", homeTeam: "Eyüpspor", awayTeam: "Galatasaray" },
     { id: "w15_m3", homeTeam: "Fenerbahçe", awayTeam: "Trabzonspor" }
   ],
   "16. Hafta": [
@@ -619,92 +619,11 @@ function renderSiralama() {
   }
 }
 
-// =====================================================================
-// GÜNCEL VE TEMİZLENMİŞ KOD YAPISI
-// =====================================================================
-
-// 1) TEK BİR ESCAPEHTML FONKSİYONU (DOM tabanlı ve güvenli)
 function escapeHtml(text) {
-  if (text == null) return "";
   const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
 }
-
-// 2) GÜNCEL renderMaclar FONKSİYONU
-function renderMatches() {
-  const container = document.getElementById("maclar-list");
-  const emptyEl = document.getElementById("maclar-empty");
-  const currentWeekMatches = FIXED_MATCHES_BY_WEEK[state.selectedWeek] || [];
-
-  container.innerHTML = "";
-  
-  currentWeekMatches.forEach(fixedMatch => {
-    const liveState = state.matches.find(m => m.id === fixedMatch.id) || { 
-        isLocked: false, 
-        isFinished: false 
-    };
-    
-    const match = { ...fixedMatch, ...liveState };
-
-    if (match.isFinished) return;
-
-    const myPred = state.predictions.find((p) => p.matchId === match.id && p.uid === state.currentUser?.uid);
-    const isAdmin = state.currentUser?.role === "admin";
-    
-    const card = document.createElement("div");
-    card.className = "match-card";
-    
-    card.innerHTML = `
-      <div class="match-card-top">
-        <span>${state.selectedWeek}</span>
-        <span class="${match.isLocked ? "badge-locked" : "badge-open"}">
-           ${match.isLocked ? "Kilitli" : "Tahmine Açık"}
-        </span>
-      </div>
-      <div class="match-teams-row">
-        <span>${escapeHtml(match.homeTeam)}</span>
-        <input type="number" class="pred-home" value="${myPred?.predHome ?? ""}" ${match.isLocked || isAdmin ? "disabled" : ""}>
-        <span>-</span>
-        <input type="number" class="pred-away" value="${myPred?.predAway ?? ""}" ${match.isLocked || isAdmin ? "disabled" : ""}>
-        <span>${escapeHtml(match.awayTeam)}</span>
-      </div>
-      ${!match.isLocked && !isAdmin ? `<button class="btn-save-pred" data-matchid="${match.id}">Tahmini Kaydet</button>` : ""}
-    `;
-    container.appendChild(card);
-  });
-
-  const activeCount = currentWeekMatches.filter(fm => {
-      const m = state.matches.find(ma => ma.id === fm.id);
-      return !m || !m.isFinished;
-  }).length;
-  
-  emptyEl.classList.toggle("hidden", activeCount > 0);
-
-  container.querySelectorAll(".btn-save-pred").forEach(btn => 
-    btn.addEventListener("click", () => saveMyPrediction({ id: btn.dataset.matchid }))
-  );
-}
-
-// 3) MODAL YARDIMCI FONKSİYONU
-function openScoreModal(matchId, home, away) {
-  state.scoreModalMatchId = matchId;
-  document.getElementById("score-modal-teams").textContent = `${home} vs ${away}`;
-  document.getElementById("score-modal").classList.remove("hidden");
-}
-
-// 4) MODAL ONAY İŞLEMİ
-document.getElementById("score-modal-confirm").addEventListener("click", async () => {
-  const homeScore = parseInt(document.getElementById("score-modal-home").value);
-  const awayScore = parseInt(document.getElementById("score-modal-away").value);
-  
-  await setDoc(doc(db, "matches", state.scoreModalMatchId), {
-    isFinished: true, isLocked: true, homeScore, awayScore
-  }, { merge: true });
-  
-  document.getElementById("score-modal").classList.add("hidden");
-  showToast("Skor girildi ve maç kapandı");
-});
 // ---------------------------------------------------------------------
 // 12) "ADMIN" SEKMESİ — Maç Yönetimi ve Kullanıcı Silme
 // ---------------------------------------------------------------------
@@ -920,15 +839,3 @@ document.getElementById("score-modal-confirm").addEventListener("click", async (
     confirmBtn.disabled = false;
   }
 });
-
-// ---------------------------------------------------------------------
-// 13) GÜVENLİK — basit HTML escape
-// ---------------------------------------------------------------------
-function escapeHtml(str) {
-  if (str == null) return "";
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot.");
-}
