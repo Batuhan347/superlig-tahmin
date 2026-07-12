@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Maç Tahmin Ligi</title>
+
+<!-- Fontlar: Rajdhani (sportif başlık fontu), Inter (gövde metni), JetBrains Mono (skor/tablo rakamları) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ======================= GİRİŞ / KAYIT EKRANI ======================= -->
+<div id="auth-screen" class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <span class="auth-brand-mark">⚽</span>
+      <h1>MAÇ TAHMİN <span class="accent">LİGİ</span></h1>
+      <p class="auth-sub">Süper Lig özel tahmin arenası</p>
+    </div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab-btn active" data-authtab="login">Giriş Yap</button>
+      <button class="auth-tab-btn" data-authtab="signup">Kayıt Ol</button>
+    </div>
+
+    <!-- Giriş formu -->
+    <form id="login-form" class="auth-form">
+      <label class="field-label">Kullanıcı Adı</label>
+      <input type="text" id="login-username" placeholder="kullaniciadi" autocomplete="username" required>
+      <label class="field-label">Şifre</label>
+      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" required>
+      <button type="submit" class="btn-primary">Giriş Yap</button>
+      <p class="auth-error" id="login-error"></p>
+    </form>
+
+    <!-- Kayıt formu -->
+    <form id="signup-form" class="auth-form hidden">
+      <label class="field-label">Kullanıcı Adı</label>
+      <input type="text" id="signup-username" placeholder="kullaniciadi" autocomplete="username" required>
+      <p class="field-hint">İlk defa tam olarak <b>"Admin"</b> yazarsan kalıcı olarak yönetici olursun.</p>
+      <label class="field-label">Şifre</label>
+      <input type="password" id="signup-password" placeholder="En az 6 karakter" autocomplete="new-password" required minlength="6">
+      <button type="submit" class="btn-primary">Hesap Oluştur</button>
+      <p class="auth-error" id="signup-error"></p>
+    </form>
+  </div>
+</div>
+
+<!-- ======================= UYGULAMA (Giriş sonrası) ======================= -->
+<div id="app" class="app hidden">
+
+  <!-- Üst bar -->
+  <header class="topbar">
+    <div class="topbar-brand">⚽ <span>Maç Tahmin Ligi</span></div>
+    <div class="topbar-user">
+      <span id="current-username" class="username-pill">--</span>
+      <button id="logout-btn" class="icon-btn" title="Çıkış Yap" aria-label="Çıkış Yap">⏻</button>
+    </div>
+  </header>
+
+  <!-- İçerik alanı -->
+  <main class="content">
+
+    <!-- ---------- SIRALAMA ---------- -->
+    <section id="tab-siralama" class="tab-panel active">
+      <div class="panel-header">
+        <h2>Sıralama</h2>
+        <p class="panel-sub">Liderlik tablosu, en güncel puan durumu</p>
+      </div>
+      <div class="table-wrap">
+        <table class="leaderboard-table">
+          <thead>
+            <tr>
+              <th class="col-rank">#</th>
+              <th class="col-name">Oyuncu</th>
+              <th>P</th>
+              <th>O</th>
+              <th>TS</th>
+              <th>K/B</th>
+              <th>Y</th>
+              <th>AV</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboard-body">
+            <!-- JS ile doldurulacak -->
+          </tbody>
+        </table>
+        <p id="leaderboard-empty" class="empty-state hidden">Henüz sonuçlanmış maç yok. Puanlar ilk maç bitince oluşacak.</p>
+      </div>
+    </section>
+
+    <!-- ---------- MAÇLAR ---------- -->
+    <section id="tab-maclar" class="tab-panel">
+      <div class="panel-header">
+        <h2>Maçlar</h2>
+        <p class="panel-sub">Tahminini yap, kilitlenmeden önce değiştirebilirsin</p>
+      </div>
+      <div id="maclar-list" class="match-list">
+        <!-- JS ile doldurulacak -->
+      </div>
+      <p id="maclar-empty" class="empty-state hidden">Şu anda aktif maç yok.</p>
+    </section>
+
+    <!-- ---------- SONUÇLAR ---------- -->
+    <section id="tab-sonuclar" class="tab-panel">
+      <div class="panel-header">
+        <h2>Sonuçlar</h2>
+        <p class="panel-sub">Tamamlanmış maçlar ve herkesin tahminleri</p>
+      </div>
+      <div id="sonuclar-list" class="match-list">
+        <!-- JS ile doldurulacak -->
+      </div>
+      <p id="sonuclar-empty" class="empty-state hidden">Henüz sonuçlanmış maç yok.</p>
+    </section>
+
+    <!-- ---------- ADMIN ---------- -->
+    <section id="tab-admin" class="tab-panel">
+      <div class="panel-header">
+        <h2>Admin Paneli</h2>
+        <p class="panel-sub">Maç ekle, kilitle ve skor gir</p>
+      </div>
+
+      <!-- Yeni maç ekleme formu -->
+      <form id="add-match-form" class="admin-add-form">
+        <div class="admin-add-row">
+          <input type="text" id="new-home-team" placeholder="Ev sahibi takım" required>
+          <span class="vs-label">vs</span>
+          <input type="text" id="new-away-team" placeholder="Deplasman takımı" required>
+        </div>
+        <div class="admin-add-row">
+          <input type="datetime-local" id="new-match-datetime" required>
+          <button type="submit" class="btn-primary btn-add">+ Maç Ekle</button>
+        </div>
+      </form>
+
+      <!-- Aktif/Geçmiş filtre sekmeleri -->
+      <div class="admin-filter-tabs">
+        <button class="admin-filter-btn active" data-adminfilter="active">Sadece Aktif Maçları Göster</button>
+        <button class="admin-filter-btn" data-adminfilter="past">Geçmiş Maçları Göster</button>
+      </div>
+
+      <div id="admin-match-list" class="match-list">
+        <!-- JS ile doldurulacak -->
+      </div>
+      <p id="admin-empty" class="empty-state hidden">Bu filtrede maç bulunamadı.</p>
+    </section>
+
+  </main>
+
+  <!-- Sabit alt menü -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-tab="siralama">
+      <span class="nav-icon">🏆</span><span class="nav-label">Sıralama</span>
+    </button>
+    <button class="nav-btn" data-tab="maclar">
+      <span class="nav-icon">⚽</span><span class="nav-label">Maçlar</span>
+    </button>
+    <button class="nav-btn" data-tab="sonuclar">
+      <span class="nav-icon">📊</span><span class="nav-label">Sonuçlar</span>
+    </button>
+    <button class="nav-btn admin-only hidden" data-tab="admin" id="admin-nav-btn">
+      <span class="nav-icon">⚙️</span><span class="nav-label">Admin</span>
+    </button>
+  </nav>
+</div>
+
+<!-- Başarı bildirimi (tahmin kaydedildi animasyonu) -->
+<div id="toast" class="toast">
+  <span class="toast-icon">✓</span>
+  <span id="toast-text">Başarıyla Kaydedildi</span>
+</div>
+
+<!-- Skor girme modalı (Admin) -->
+<div id="score-modal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <h3>Gerçek Skoru Gir</h3>
+    <p id="score-modal-teams" class="modal-teams">-- vs --</p>
+    <div class="score-input-row">
+      <input type="number" id="score-modal-home" min="0" max="99" placeholder="0">
+      <span class="score-sep">-</span>
+      <input type="number" id="score-modal-away" min="0" max="99" placeholder="0">
+    </div>
+    <div class="modal-actions">
+      <button id="score-modal-cancel" class="btn-ghost">Vazgeç</button>
+      <button id="score-modal-confirm" class="btn-primary">Haftayı Kapat / Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK (modüler, CDN üzerinden) — firebase-config.js, app.js içinde import edilir -->
+<script type="module" src="app.js"></script>
+</body>
+</html>
