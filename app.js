@@ -554,6 +554,7 @@ function renderSonuclar() {
 // ---------------------------------------------------------------------
 function renderSiralama() {
   const tbody = document.getElementById("leaderboard-body");
+  const teamStatsBody = document.getElementById("team-stats-body");
   const emptyEl = document.getElementById("leaderboard-empty");
   if (!state.currentUser) return;
 
@@ -563,12 +564,12 @@ function renderSiralama() {
     return { ...fixedMatch, ...liveState };
   }).filter((m) => m.isFinished);
 
-  // Filtreleme: rolü admin olan kullanıcıları puan durumundan çıkarıyoruz
   const playersOnly = state.users.filter(u => u.role !== "admin");
 
   const rows = playersOnly.map((user) => {
     let P = 0, TS = 0, KB = 0, Y = 0;
-    const O = finishedMatches.length;
+    // Takım kısaltmalarına göre TS sayaçları
+    const teamTS = { BJK: 0, GS: 0, FB: 0, TS: 0 };
 
     finishedMatches.forEach((match) => {
       const pred = state.predictions.find((p) => p.matchId === match.id && p.uid === user.uid);
@@ -578,34 +579,55 @@ function renderSiralama() {
       }
       const { points, type } = calculatePoints(pred.predHome, pred.predAway, match.homeScore, match.awayScore);
       P += points;
-      if (type === "TS") TS += 1;
-      else if (type === "KB") KB += 1;
-      else Y += 1;
+      
+      if (type === "TS") {
+        TS += 1;
+        // Tahmin edilen takımın kısaltmasını buluyoruz (HomeTeam kısaltması varsayıldı)
+        if (teamTS.hasOwnProperty(match.homeTeamShort)) {
+          teamTS[match.homeTeamShort] += 1;
+        }
+      } else if (type === "KB") {
+        KB += 1;
+      } else {
+        Y += 1;
+      }
     });
 
-    const AV = O > 0 ? (P / O).toFixed(2) : "0.00";
-    return { uid: user.uid, username: user.username, P, O, TS, KB, Y, AV };
+    return { uid: user.uid, username: user.username, P, TS, KB, Y, teamTS };
   });
 
-  rows.sort((a, b) => b.P - a.P || parseFloat(b.AV) - parseFloat(a.AV));
+  // SIRALAMA: Puan (P) büyükten küçüğe, eşitse Yanlış (Y) küçükten büyüğe
+  rows.sort((a, b) => b.P - a.P || a.Y - b.Y);
 
   if (emptyEl) emptyEl.classList.toggle("hidden", finishedMatches.length > 0);
+  
+  // Ana Puan Tablosu (Averaj sütunu kaldırıldı)
   if (tbody) {
     tbody.innerHTML = rows.map((r, i) => `
       <tr class="${i === 0 ? "rank-1" : ""} ${r.uid === state.currentUser.uid ? "is-me" : ""}">
         <td class="col-rank">${i + 1}</td>
         <td class="col-name">${escapeHtml(r.username)}</td>
         <td class="col-points">${r.P}</td>
-        <td>${r.O}</td>
         <td>${r.TS}</td>
         <td>${r.KB}</td>
         <td>${r.Y}</td>
-        <td>${r.AV}</td>
+      </tr>
+    `).join("");
+  }
+
+  // Yeni Takım Bazlı TS Tablosu
+  if (teamStatsBody) {
+    teamStatsBody.innerHTML = rows.map(r => `
+      <tr>
+        <td>${escapeHtml(r.username)}</td>
+        <td>${r.teamTS.BJK}</td>
+        <td>${r.teamTS.GS}</td>
+        <td>${r.teamTS.FB}</td>
+        <td>${r.teamTS.TS}</td>
       </tr>
     `).join("");
   }
 }
-
 // ---------------------------------------------------------------------
 // 12) "ADMIN" SEKMESİ — Maç Yönetimi ve Kullanıcı Silme
 // ---------------------------------------------------------------------
